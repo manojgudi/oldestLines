@@ -2,7 +2,6 @@
 import Control.Exception
 import Data.List (isInfixOf)
 import HSH (run)
-import RecursiveContents (getRecursiveContents)
 
 {-
  - Remember Textdifference between IO String and IO (String)
@@ -18,17 +17,17 @@ getTrackedFiles :: IO String
 getTrackedFiles = run $ "git ls-files" :: IO String
 
 isOldestHash :: String -> String -> Bool
-isOldestHash blameLine oldestHash = if (not (isInfixOf "fatal" blameLine )) &&  (blameLine == oldestHash)
-    then  True
-    else  False 
+-- Match the first ten digits of oldest hash
+isOldestHash oldestHash blameLine = if (isInfixOf (take 10 oldestHash) blameLine) then  True else  False
 
 --getAllLines 
-getAllOldestLine :: String -> String -> IO ()
+getAllOldestLine :: String -> String -> IO [String]
 getAllOldestLine oldestHash myFile = do 
     --let rawGitBlame = run $ "git --no-pager -C ../../supa/ " ++ " blame -l " ++ myFile
-    let rawGitBlame = run $ "git --no-pager " ++ " blame -l " ++ myFile
+    let rawGitBlame = run $ "git --no-pager " ++ " blame -l " ++ myFile :: IO String 
     gitBlameContent <- rawGitBlame
-    print [ blameLine | blameLine <- lines gitBlameContent, isOldestHash (take 40 blameLine) oldestHash ]
+
+    return [ blameLine | blameLine <- lines gitBlameContent, isOldestHash oldestHash blameLine  ]
 
 -- Checks if the string contains commit Hash
 isCommitString :: String -> Bool
@@ -43,16 +42,9 @@ extractOldestHash commitHashString = drop 7 $ ( dropWhile isCommitString  $ reve
 
 main :: IO ()
 main = do 
-{-
-            myString <- try (getAllCommitHash)
-            case myString of
-                Left (_ :: SomeException) -> putStrLn "Error"
-                Right(_ :: String) -> putStrLn "OK"
--}
             myString <- getAllCommitHash
-            putStrLn $ "Oldest Hash "  ++  extractOldestHash myString
             allFiles <- fmap lines getTrackedFiles
 
-            putStrLn "All Files "
-            print allFiles
-
+            out <- mapM (getAllOldestLine (extractOldestHash myString)) allFiles
+            putStrLn "OUT "
+            print out
